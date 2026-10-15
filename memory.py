@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+import urllib.error
 import urllib.request
 from config import GROQ_API_KEY
 from dataclasses import dataclass, field
@@ -18,7 +20,7 @@ class Memory:
 
 API_KEY = GROQ_API_KEY or os.environ.get("GROQ_API_KEY")
 API_BASE = "https://api.groq.com/openai/v1"
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-120b"
 
 EXTRACT_SYSTEM = (
     "You extract durable facts about a user from conversations.\n"
@@ -77,6 +79,24 @@ def _save() -> None:
     STORE_PATH.write_text(json.dumps(rows, indent=2))
 
 
+HEADERS = {
+    "Content-Type": "application/json",
+    "User-Agent": "memory-demo/1.0",
+}
+
+
+def list_models() -> list[str]:
+    request = urllib.request.Request(
+        f"{API_BASE}/models",
+        headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return [m["id"] for m in json.loads(response.read())["data"]]
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"could not list models: {e.code} {e.read().decode()[:300]}")
+
+
 def _complete(system: str, user: str) -> str:
     payload = json.dumps(
         {
@@ -90,13 +110,16 @@ def _complete(system: str, user: str) -> str:
     request = urllib.request.Request(
         f"{API_BASE}/chat/completions",
         data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}",
-        },
+        headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
     )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        body = json.loads(response.read())
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = json.loads(response.read())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(
+            f"Groq {e.code}: {e.read().decode()[:400]}\n"
+            f"model = {MODEL!r} - run 'python memory.py models' to see what is live"
+        )
     return body["choices"][0]["message"]["content"]
 
 
@@ -182,4 +205,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "models":
+        if not API_KEY:
+            raise SystemExit("set GROQ_API_KEY in config.py first")
+        for name in list_models():
+            print(name)
+    else:
+        main()
