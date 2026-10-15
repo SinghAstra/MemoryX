@@ -31,11 +31,12 @@ def remember(text: str) -> Memory:
 
 
 def recall(query: str, limit: int = 3) -> list[Memory]:
-    wanted = set(query.lower().split())
+    query_words = set(query.lower().split())
 
     scored: list[tuple[int, Memory]] = []
     for m in _MEMORIES:
-        overlap = wanted & set(m.text.lower().split())
+        memory_words = set(m.text.lower().split())
+        overlap = query_words & memory_words
         if overlap:
             scored.append((len(overlap), m))
 
