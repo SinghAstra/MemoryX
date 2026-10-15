@@ -10,17 +10,36 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from fastembed import TextEmbedding
+
 
 @dataclass
 class Memory:
     id: int
     text: str
+    vector: list[float] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "text": self.text,
+            "vector": self.vector,
+            "created_at": self.created_at.isoformat(),
+        }
 
 
 API_KEY = GROQ_API_KEY or os.environ.get("GROQ_API_KEY")
 API_BASE = "https://api.groq.com/openai/v1"
 MODEL = "openai/gpt-oss-120b"
+
+EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
+
+HEADERS = {
+    "Content-Type": "application/json",
+    "User-Agent": "memory-demo/1.0",
+}
 
 EXTRACT_SYSTEM = (
     "You extract durable facts about a user from conversations.\n"
@@ -47,6 +66,19 @@ _SEED = [
 
 STORE_PATH = Path(__file__).parent / "memories.json"
 
+_EMBEDDER = None
+
+
+def embed(texts: list[str]) -> list[list[float]]:
+    global _EMBEDDER
+    if _EMBEDDER is None:
+        _EMBEDDER = TextEmbedding(EMBED_MODEL)
+    return [[float(x) for x in v] for v in _EMBEDDER.embed(texts)]
+
+
+def _dot(a: list[float], b: list[float]) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
 
 def _load() -> list[Memory]:
     if not STORE_PATH.exists():
@@ -58,6 +90,7 @@ def _load() -> list[Memory]:
             Memory(
                 id=row["id"],
                 text=row["text"],
+                vector=row.get("vector", []),
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
         )
@@ -68,21 +101,16 @@ _MEMORIES: list[Memory] = _load()
 
 
 def _save() -> None:
-    rows = [
-        {
-            "id": m.id,
-            "text": m.text,
-            "created_at": m.created_at.isoformat(),
-        }
-        for m in _MEMORIES
-    ]
-    STORE_PATH.write_text(json.dumps(rows, indent=2))
+    STORE_PATH.write_text(json.dumps([m.to_dict() for m in _MEMORIES], indent=2))
 
 
-HEADERS = {
-    "Content-Type": "application/json",
-    "User-Agent": "memory-demo/1.0",
-}
+def _ensure_vectors() -> None:
+    missing = [m for m in _MEMORIES if not m.vector]
+    if not missing:
+        return
+    for m, vector in zip(missing, embed([m.text for m in missing])):
+        m.vector = vector
+    _save()
 
 
 def list_models() -> list[str]:
@@ -137,7 +165,7 @@ def remember(text: str) -> Memory:
         if m.text.lower() == clean.lower():
             return m
 
-    m = Memory(id=len(_MEMORIES) + 1, text=clean)
+    m = Memory(id=len(_MEMORIES) + 1, text=clean, vector=embed([clean])[0])
     _MEMORIES.append(m)
     _save()
     return m
@@ -149,6 +177,19 @@ def reset() -> None:
 
 
 def recall(query: str, limit: int = 3) -> list[Memory]:
+    query_vector = embed([QUERY_PREFIX + query])[0]
+
+    scored: list[tuple[float, Memory]] = []
+    for memory in _MEMORIES:
+        if not memory.vector:
+            continue
+        scored.append((_dot(query_vector, memory.vector), memory))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [m for _, m in scored[:limit]]
+
+
+def recall_keywords(query: str, limit: int = 3) -> list[Memory]:
     query_words = set(query.lower().split())
 
     scored: list[tuple[int, Memory]] = []
@@ -166,11 +207,23 @@ def list_all() -> list[Memory]:
     return list(_MEMORIES)
 
 
+def _compare(query: str, limit: int = 3) -> None:
+    print(f"--- {query!r} ---")
+    for label, fn in (("semantic", recall), ("keywords", recall_keywords)):
+        hits = fn(query, limit)
+        if not hits:
+            print(f"  {label:<9} (nothing)")
+        for m in hits:
+            print(f"  {label:<9} [{m.id}] {m.text}")
+
+
 def main() -> None:
     if not _MEMORIES:
         for m in _SEED:
             remember(m)
         remember("User dislikes the gym near their office")
+
+    _ensure_vectors()
 
     print(f"store: {STORE_PATH}\n")
 
@@ -181,27 +234,21 @@ def main() -> None:
             print(f"  {fact}")
         for fact in facts:
             remember(fact)
+        _ensure_vectors()
         print()
     else:
         print("no GROQ_API_KEY set (config.py or env) - skipping extraction\n")
 
     print(f"stored {len(list_all())} memories\n")
 
-    print("--- recall('what is her name') ---")
-    for m in recall("what is her name"):
-        print(f"  [{m.id}] {m.text}")
-
-    print("\n--- recall('where do they live') ---")
-    for m in recall("where do they live"):
-        print(f"  [{m.id}] {m.text}")
-
-    print("\n--- recall('what do they do for work') ---")
-    hits = recall("what do they do for work")
-    if hits:
-        for m in hits:
-            print(f"  [{m.id}] {m.text}")
-    else:
-        print("  (nothing)")
+    for q in (
+        "what is her name",
+        "where do they live",
+        "what does she do at work",
+        "what programming language",
+    ):
+        _compare(q)
+        print()
 
 
 if __name__ == "__main__":
