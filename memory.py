@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
+from config import GROQ_API_KEY
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,9 +16,9 @@ class Memory:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-API_KEY = os.environ.get("OPENAI_API_KEY")
-API_BASE = "https://api.openai.com/v1"
-MODEL = "gpt-4o-mini"
+API_KEY = GROQ_API_KEY or os.environ.get("GROQ_API_KEY")
+API_BASE = "https://api.groq.com/openai/v1"
+MODEL = "llama-3.3-70b-versatile"
 
 EXTRACT_SYSTEM = (
     "You extract durable facts about a user from conversations.\n"
@@ -159,7 +160,7 @@ def main() -> None:
             remember(fact)
         print()
     else:
-        print("no OPENAI_API_KEY set - skipping extraction\n")
+        print("no GROQ_API_KEY set (config.py or env) - skipping extraction\n")
 
     print(f"stored {len(list_all())} memories\n")
 
