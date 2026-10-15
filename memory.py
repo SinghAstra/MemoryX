@@ -1,6 +1,9 @@
 from __future__ import annotations
+
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 
 @dataclass
@@ -17,7 +20,38 @@ _SEED = [
     "User is learning Portuguese",
 ]
 
-_MEMORIES: list[Memory] = []
+STORE_PATH = Path(__file__).parent / "memories.json"
+
+
+def _load() -> list[Memory]:
+    if not STORE_PATH.exists():
+        return []
+
+    out: list[Memory] = []
+    for row in json.loads(STORE_PATH.read_text()):
+        out.append(
+            Memory(
+                id=row["id"],
+                text=row["text"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+            )
+        )
+    return out
+
+
+_MEMORIES: list[Memory] = _load()
+
+
+def _save() -> None:
+    rows = [
+        {
+            "id": m.id,
+            "text": m.text,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in _MEMORIES
+    ]
+    STORE_PATH.write_text(json.dumps(rows, indent=2))
 
 
 def remember(text: str) -> Memory:
@@ -27,18 +61,24 @@ def remember(text: str) -> Memory:
 
     m = Memory(id=len(_MEMORIES) + 1, text=clean)
     _MEMORIES.append(m)
+    _save()
     return m
+
+
+def reset() -> None:
+    _MEMORIES.clear()
+    _save()
 
 
 def recall(query: str, limit: int = 3) -> list[Memory]:
     query_words = set(query.lower().split())
 
     scored: list[tuple[int, Memory]] = []
-    for m in _MEMORIES:
-        memory_words = set(m.text.lower().split())
+    for memory in _MEMORIES:
+        memory_words = set(memory.text.lower().split())
         overlap = query_words & memory_words
         if overlap:
-            scored.append((len(overlap), m))
+            scored.append((len(overlap), memory))
 
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return [m for _, m in scored[:limit]]
@@ -49,11 +89,15 @@ def list_all() -> list[Memory]:
 
 
 def main() -> None:
-    for m in _SEED:
-        remember(m)
-    remember("User dislikes the gym near their office")
+    print(f"store: {STORE_PATH}")
 
-    print(f"stored {len(list_all())} memories\n")
+    if not _MEMORIES:
+        for m in _SEED:
+            remember(m)
+        remember("User dislikes the gym near their office")
+        print(f"seeded {len(_MEMORIES)} memories\n")
+    else:
+        print(f"loaded {len(_MEMORIES)} memories from disk\n")
 
     print("--- recall('what is her name') ---")
     for m in recall("what is her name"):
