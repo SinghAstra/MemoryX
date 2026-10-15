@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +14,26 @@ class Memory:
     text: str
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+
+API_KEY = os.environ.get("OPENAI_API_KEY")
+API_BASE = "https://api.openai.com/v1"
+MODEL = "gpt-4o-mini"
+
+EXTRACT_SYSTEM = (
+    "You extract durable facts about a user from conversations.\n"
+    "Rules:\n"
+    "- Each fact must stand alone with no context needed.\n"
+    "- Start every fact with 'User'.\n"
+    "- Skip anything temporary, uncertain, or about the assistant.\n"
+    "- One fact per line, nothing else."
+)
+
+_SAMPLE_CHAT = """user: hi, i'm sarah. i work at acme as vp of product
+assistant: nice to meet you sarah
+user: i've been going to the ts meetup on thursdays lately
+user: also i just moved to san francisco, been here about a month
+assistant: congrats on the move
+user: any good ramen places near soma?"""
 
 _SEED = [
     "User's name is Sarah",
@@ -54,10 +76,42 @@ def _save() -> None:
     STORE_PATH.write_text(json.dumps(rows, indent=2))
 
 
+def _complete(system: str, user: str) -> str:
+    payload = json.dumps(
+        {
+            "model": MODEL,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+    ).encode()
+    request = urllib.request.Request(
+        f"{API_BASE}/chat/completions",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        body = json.loads(response.read())
+    return body["choices"][0]["message"]["content"]
+
+
+def extract_facts(transcript: str) -> list[str]:
+    raw = _complete(EXTRACT_SYSTEM, transcript)
+    return [line.strip("-* ").strip() for line in raw.splitlines() if line.strip()]
+
+
 def remember(text: str) -> Memory:
     clean = text.strip()
     if not clean:
         raise ValueError("cannot remember nothing")
+
+    for m in _MEMORIES:
+        if m.text.lower() == clean.lower():
+            return m
 
     m = Memory(id=len(_MEMORIES) + 1, text=clean)
     _MEMORIES.append(m)
@@ -89,22 +143,32 @@ def list_all() -> list[Memory]:
 
 
 def main() -> None:
-    print(f"store: {STORE_PATH}")
-
     if not _MEMORIES:
         for m in _SEED:
             remember(m)
         remember("User dislikes the gym near their office")
-        print(f"seeded {len(_MEMORIES)} memories\n")
+
+    print(f"store: {STORE_PATH}\n")
+
+    if API_KEY:
+        facts = extract_facts(_SAMPLE_CHAT)
+        print(f"--- extracted {len(facts)} facts ---")
+        for fact in facts:
+            print(f"  {fact}")
+        for fact in facts:
+            remember(fact)
+        print()
     else:
-        print(f"loaded {len(_MEMORIES)} memories from disk\n")
+        print("no OPENAI_API_KEY set - skipping extraction\n")
+
+    print(f"stored {len(list_all())} memories\n")
 
     print("--- recall('what is her name') ---")
     for m in recall("what is her name"):
         print(f"  [{m.id}] {m.text}")
 
-    print("\n--- recall('typescript') ---")
-    for m in recall("typescript"):
+    print("\n--- recall('where do they live') ---")
+    for m in recall("where do they live"):
         print(f"  [{m.id}] {m.text}")
 
     print("\n--- recall('what do they do for work') ---")
@@ -114,10 +178,6 @@ def main() -> None:
             print(f"  [{m.id}] {m.text}")
     else:
         print("  (nothing)")
-
-    print("\n--- recall('portuguese') ---")
-    for m in recall("portuguese"):
-        print(f"  [{m.id}] {m.text}")
 
 
 if __name__ == "__main__":
