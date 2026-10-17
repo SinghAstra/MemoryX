@@ -28,8 +28,24 @@ def list_models() -> list[str]:
         raise RuntimeError(f"could not list models: {e.code} {e.read().decode()[:300]}")
 
 
+def _post(payload: dict) -> dict:
+    request = urllib.request.Request(
+        f"{API_BASE}/chat/completions",
+        data=json.dumps(payload).encode(),
+        headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(
+            f"Groq {e.code}: {e.read().decode()[:400]}\n"
+            f"model = {MODEL!r} - run 'python -m brain models' to see what is live"
+        )
+
+
 def complete(system: str, user: str) -> str:
-    payload = json.dumps(
+    body = _post(
         {
             "model": MODEL,
             "messages": [
@@ -37,32 +53,31 @@ def complete(system: str, user: str) -> str:
                 {"role": "user", "content": user},
             ],
         }
-    ).encode()
-    request = urllib.request.Request(
-        f"{API_BASE}/chat/completions",
-        data=payload,
-        headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
     )
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            body = json.loads(response.read())
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(
-            f"Groq {e.code}: {e.read().decode()[:400]}\n"
-            f"model = {MODEL!r} - run 'python -m brain models' to see what is live"
-        )
     return body["choices"][0]["message"]["content"]
 
 
-def extract_facts(transcript: str) -> list[str]:
-    raw = complete(EXTRACT_SYSTEM, transcript)
+def complete_list(system: str, user: str, key: str) -> list[str]:
+    shape = f'Reply with JSON only, shaped as {{"{key}": ["..."]}}'
+    body = _post(
+        {
+            "model": MODEL,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": f"{system}\n{shape}"},
+                {"role": "user", "content": user},
+            ],
+        }
+    )
+    raw = body["choices"][0]["message"]["content"]
+    data = json.loads(raw)
+    values = data.get(key, []) if isinstance(data, dict) else []
+    return [str(v).strip() for v in values if str(v).strip()]
 
-    out: list[str] = []
-    for line in raw.splitlines():
-        fact = line.strip("-* ").strip()
-        if len(fact) >= MIN_FACT_CHARS:
-            out.append(fact)
-    return out
+
+def extract_facts(transcript: str) -> list[str]:
+    facts = complete_list(EXTRACT_SYSTEM, transcript, "facts")
+    return [f for f in facts if len(f) >= MIN_FACT_CHARS]
 
 
 def format_memories(hits: list[Memory]) -> str:

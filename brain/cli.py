@@ -1,6 +1,6 @@
 from __future__ import annotations
 import sys
-from .chat import run
+from .chat import _write_safely, run
 from .llm import answer, extract_facts, list_models
 from .models import Memory
 from .search import keywords, semantic
@@ -56,8 +56,7 @@ def demo(store: Store) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    _write_safely()
 
     args = sys.argv[1:] if argv is None else argv
     store = Store(STORE_PATH)

@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import sys
+
 from .llm import answer, extract_facts
 from .search import semantic
 from .store import Store
 
 
+def _write_safely() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
 def run(store: Store) -> None:
+    _write_safely()
+
     while True:
         try:
             line = input("you: ").strip()
