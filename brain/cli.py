@@ -1,15 +1,14 @@
 from __future__ import annotations
-
 import sys
-
 from .chat import run
 from .llm import answer, extract_facts, list_models
+from .models import Memory
 from .search import keywords, semantic
 from .settings import API_KEY, SAMPLE_CHAT, SEED, STORE_PATH
 from .store import Store
 
 
-def _compare(items, query: str, limit: int = 3) -> None:
+def _compare(items: list[Memory], query: str, limit: int = 3) -> None:
     print(f"--- {query!r} ---")
     for label, fn in (("semantic", semantic), ("keywords", keywords)):
         hits = fn(items, query, limit)
