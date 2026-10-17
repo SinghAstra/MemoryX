@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from typing import TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from .models import Memory
 from .settings import (
@@ -14,6 +17,17 @@ from .settings import (
     MIN_FACT_CHARS,
     MODEL,
 )
+
+
+class Facts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    facts: list[str] = Field(
+        description=(
+            "One self-contained fact about the user. No pronouns. "
+            "No reference to the conversation. Must make sense alone."
+        )
+    )
 
 
 def list_models() -> list[str]:
@@ -57,27 +71,34 @@ def complete(system: str, user: str) -> str:
     return body["choices"][0]["message"]["content"]
 
 
-def complete_list(system: str, user: str, key: str) -> list[str]:
-    shape = f'Reply with JSON only, shaped as {{"{key}": ["..."]}}'
+T = TypeVar("T", bound=BaseModel)
+
+
+def complete_schema(system: str, user: str, schema: type[T]) -> T:
     body = _post(
         {
             "model": MODEL,
-            "response_format": {"type": "json_object"},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema.__name__.lower(),
+                    "schema": schema.model_json_schema(),
+                    "strict": True,
+                },
+            },
             "messages": [
-                {"role": "system", "content": f"{system}\n{shape}"},
+                {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
         }
     )
-    raw = body["choices"][0]["message"]["content"]
-    data = json.loads(raw)
-    values = data.get(key, []) if isinstance(data, dict) else []
-    return [str(v).strip() for v in values if str(v).strip()]
+    return schema.model_validate_json(body["choices"][0]["message"]["content"])
 
 
 def extract_facts(transcript: str) -> list[str]:
-    facts = complete_list(EXTRACT_SYSTEM, transcript, "facts")
-    return [f for f in facts if len(f) >= MIN_FACT_CHARS]
+    result = complete_schema(EXTRACT_SYSTEM, transcript, Facts)
+    cleaned = (f.strip() for f in result.facts)
+    return [f for f in cleaned if len(f) >= MIN_FACT_CHARS]
 
 
 def format_memories(hits: list[Memory]) -> str:
