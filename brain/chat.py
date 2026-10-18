@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 import sys
-
 from .llm import answer, extract_facts
 from .search import semantic
 from .store import Store

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from .models import Memory
 from .settings import QUERY_PREFIX
 from .vectors import dot, embed

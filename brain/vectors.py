@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from fastembed import TextEmbedding
 
 from .settings import EMBED_MODEL

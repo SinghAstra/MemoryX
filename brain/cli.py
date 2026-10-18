@@ -1,4 +1,3 @@
-from __future__ import annotations
 import sys
 from .chat import _write_safely, run
 from .llm import answer, extract_facts, list_models
