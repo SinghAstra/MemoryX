@@ -1,10 +1,7 @@
-import json
-import urllib.error
-import urllib.request
+from json import loads, dumps
+from urllib import request, error
 from typing import TypeVar
-
 from pydantic import BaseModel, ConfigDict, Field
-
 from .models import Memory
 from .settings import (
     ANSWER_SYSTEM,
@@ -19,7 +16,6 @@ from .settings import (
 
 class Facts(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     facts: list[str] = Field(
         description=(
             "One self-contained fact about the user. No pronouns. "
@@ -29,27 +25,27 @@ class Facts(BaseModel):
 
 
 def list_models() -> list[str]:
-    request = urllib.request.Request(
+    req = request.Request(
         f"{API_BASE}/models",
         headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return [m["id"] for m in json.loads(response.read())["data"]]
-    except urllib.error.HTTPError as e:
+        with request.urlopen(req, timeout=30) as response:
+            return [m["id"] for m in loads(response.read())["data"]]
+    except error.HTTPError as e:
         raise RuntimeError(f"could not list models: {e.code} {e.read().decode()[:300]}")
 
 
 def _post(payload: dict) -> dict:
-    request = urllib.request.Request(
+    req = request.Request(
         f"{API_BASE}/chat/completions",
-        data=json.dumps(payload).encode(),
+        data=dumps(payload).encode(),
         headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return json.loads(response.read())
-    except urllib.error.HTTPError as e:
+        with request.urlopen(req, timeout=60) as response:
+            return loads(response.read())
+    except error.HTTPError as e:
         raise RuntimeError(
             f"Groq {e.code}: {e.read().decode()[:400]}\n"
             f"model = {MODEL!r} - run 'python -m brain models' to see what is live"
