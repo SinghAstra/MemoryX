@@ -9,14 +9,14 @@ from .vectors import embed
 class Store:
     def __init__(self, path: Path) -> None:
         self.path = path
-        self.items: list[Memory] = self._read()
+        self.memories: list[Memory] = self._read()
 
     def _read(self) -> list[Memory]:
         if not self.path.exists():
             return []
-        out: list[Memory] = []
+        memories: list[Memory] = []
         for row in json.loads(self.path.read_text()):
-            out.append(
+            memories.append(
                 Memory(
                     id=row["id"],
                     text=row["text"],
@@ -24,33 +24,33 @@ class Store:
                     created_at=datetime.fromisoformat(row["created_at"]),
                 )
             )
-        return out
+        return memories
 
     def save(self) -> None:
-        rows = [m.to_dict() for m in self.items]
+        rows = [memory.to_dict() for memory in self.memories]
         self.path.write_text(json.dumps(rows, indent=2))
 
     def all(self) -> list[Memory]:
-        return list(self.items)
+        return list(self.memories)
 
     def remember(self, text: str) -> Memory:
         clean = text.strip()
         if not clean:
             raise ValueError("cannot remember nothing")
-        for m in self.items:
+        for m in self.memories:
             if m.text.lower() == clean.lower():
                 return m
-        m = Memory(id=len(self.items) + 1, text=clean, vector=embed([clean])[0])
-        self.items.append(m)
+        m = Memory(id=len(self.memories) + 1, text=clean, vector=embed([clean])[0])
+        self.memories.append(m)
         self.save()
         return m
 
     def reset(self) -> None:
-        self.items.clear()
+        self.memories.clear()
         self.save()
 
     def ensure_vectors(self) -> None:
-        missing = [m for m in self.items if not m.vector]
+        missing = [m for m in self.memories if not m.vector]
         if not missing:
             return
         for m, vector in zip(missing, embed([m.text for m in missing])):
