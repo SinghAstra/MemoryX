@@ -14,7 +14,6 @@ class Store:
     def _read(self) -> list[Memory]:
         if not self.path.exists():
             return []
-
         out: list[Memory] = []
         for row in json.loads(self.path.read_text()):
             out.append(
@@ -38,11 +37,9 @@ class Store:
         clean = text.strip()
         if not clean:
             raise ValueError("cannot remember nothing")
-
         for m in self.items:
             if m.text.lower() == clean.lower():
                 return m
-
         m = Memory(id=len(self.items) + 1, text=clean, vector=embed([clean])[0])
         self.items.append(m)
         self.save()

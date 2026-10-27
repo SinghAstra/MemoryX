@@ -26,7 +26,7 @@ class Facts(BaseModel):
 
 def list_models() -> list[str]:
     req = request.Request(
-        f"{API_BASE}/models",
+        url=f"{API_BASE}/models",
         headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
     )
     try:
@@ -38,7 +38,7 @@ def list_models() -> list[str]:
 
 def _post(payload: dict) -> dict:
     req = request.Request(
-        f"{API_BASE}/chat/completions",
+        url=f"{API_BASE}/chat/completions",
         data=dumps(payload).encode(),
         headers={**HEADERS, "Authorization": f"Bearer {API_KEY}"},
     )

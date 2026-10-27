@@ -1,9 +1,6 @@
 from fastembed import TextEmbedding
-
 from .settings import EMBED_MODEL
-
 _embedder = None
-
 
 def embed(texts: list[str]) -> list[list[float]]:
     global _embedder

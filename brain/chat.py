@@ -18,16 +18,13 @@ def run(store: Store) -> None:
         except (EOFError, KeyboardInterrupt):
             print()
             break
-
         if line in ("exit", "quit"):
             break
         if not line:
             continue
-
         hits = semantic(store.all(), line)
         reply = answer(line, hits)
         print(f"     [{len(hits)} memories recalled]\nai:  {reply}\n")
-
         transcript = f"user: {line}\nassistant: {reply}"
         for fact in extract_facts(transcript):
             store.remember(fact)

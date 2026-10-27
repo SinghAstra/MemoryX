@@ -56,17 +56,14 @@ def demo(store: Store) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     _write_safely()
-
     args = sys.argv[1:] if argv is None else argv
     store = Store(STORE_PATH)
-
     if args and args[0] == "models":
         if not API_KEY:
             raise SystemExit("set GROQ_API_KEY in config.py first")
         for name in list_models():
             print(name)
         return
-
     if args and args[0] == "chat":
         if not API_KEY:
             raise SystemExit("set GROQ_API_KEY in config.py first")
@@ -75,5 +72,4 @@ def main(argv: list[str] | None = None) -> None:
         store.ensure_vectors()
         run(store)
         return
-
     demo(store)
