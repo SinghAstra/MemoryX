@@ -10,10 +10,10 @@ from .store import Store
 def _compare(items: list[Memory], query: str, limit: int = 3) -> None:
     print(f"--- {query!r} ---")
     for label, fn in (("semantic", semantic), ("keywords", keywords)):
-        hits = fn(items, query, limit)
-        if not hits:
+        retrieved_memories = fn(items, query, limit)
+        if not retrieved_memories:
             print(f"  {label:<9} (nothing)")
-        for m in hits:
+        for m in retrieved_memories:
             print(f"  {label:<9} [{m.id}] {m.text}")
 
 

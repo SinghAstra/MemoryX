@@ -22,9 +22,9 @@ def run(store: Store) -> None:
             break
         if not line:
             continue
-        hits = semantic(store.all(), line)
-        reply = answer(line, hits)
-        print(f"     [{len(hits)} memories recalled]\nai:  {reply}\n")
+        retrieved_memories = semantic(store.all(), line)
+        reply = answer(line, retrieved_memories)
+        print(f"     [{len(retrieved_memories)} memories recalled]\nai:  {reply}\n")
         transcript = f"user: {line}\nassistant: {reply}"
         for fact in extract_facts(transcript):
             store.remember(fact)

@@ -1,7 +1,6 @@
 import json
 from datetime import datetime
 from pathlib import Path
-
 from .models import Memory
 from .vectors import embed
 
@@ -50,9 +49,9 @@ class Store:
         self.save()
 
     def ensure_vectors(self) -> None:
-        missing = [m for m in self.memories if not m.vector]
+        missing = [memory for memory in self.memories if not memory.vector]
         if not missing:
             return
-        for m, vector in zip(missing, embed([m.text for m in missing])):
-            m.vector = vector
+        for memory, vector in zip(missing, embed([memory.text for memory in missing])):
+            memory.vector = vector
         self.save()
