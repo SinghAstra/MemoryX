@@ -4,11 +4,6 @@ from .search import semantic
 from .store import Store
 
 
-def _write_safely() -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-
 def run(store: Store) -> None:
     _write_safely()
 
