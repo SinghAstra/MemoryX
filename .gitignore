@@ -1,4 +1,7 @@
 memories.json
+memoryx.db
+*.db
+.env
 config.py
 __pycache__/
 .venv/
@@ -6,3 +9,4 @@ venv/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/
+evals/reports/

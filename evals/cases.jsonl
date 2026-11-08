@@ -1,0 +1,6 @@
+{"id":"c1","kind":"simple_recall","container":"eval_c1","setup":["User lives in San Francisco, California."],"query":"san francisco","expected":["User lives in San Francisco"]}
+{"id":"c2","kind":"simple_recall","container":"eval_c2","setup":["User works at Acme as a VP of Product."],"query":"acme","expected":["User works at Acme"]}
+{"id":"c3","kind":"simple_recall","container":"eval_c3","setup":["User prefers TypeScript and dark mode."],"query":"dark mode","expected":["User prefers TypeScript and dark mode"]}
+{"id":"c4","kind":"simple_recall","container":"eval_c4","setup":["User's name is Sarah."],"query":"sarah","expected":["User's name is Sarah"]}
+{"id":"c5","kind":"simple_recall","container":"eval_c5","setup":["User is learning Portuguese on Tuesdays."],"query":"portuguese","expected":["User is learning Portuguese"]}
+{"id":"c6","kind":"exact_token","container":"eval_c6","setup":["The project code is MEMX-2048 and it ships in March."],"query":"MEMX-2048","expected":["MEMX-2048"]}
